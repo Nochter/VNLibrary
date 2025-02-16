@@ -12,6 +12,8 @@ import javax.sound.sampled.Clip;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class VNLibrary {
     private static DefaultListModel<File> list; //Behind the scenes list for files in Library
@@ -22,6 +24,7 @@ public class VNLibrary {
     private static Color listColor = new java.awt.Color(80,63,51);
     private static Color buttonsColor = new java.awt.Color(111,85,66);
     private static Color borderColor = new java.awt.Color(54,40,29);
+    private static final Map<File, Icon> shortcutIcons = new HashMap<>();
 
     public static void main(String[] args) {
         try{
@@ -177,9 +180,6 @@ public class VNLibrary {
         private Font textFont = new Font("Tahoma", 0, 20);
         private AudioInputStream fx;
         private Clip clip;
-        private BufferedImage buffered;
-        private Graphics2D buffImg;
-        private Image scaled;
 
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
@@ -187,7 +187,10 @@ public class VNLibrary {
             if(value instanceof File){
                 File file = (File) value;
                 label.setText(file.getName().substring(0, file.getName().lastIndexOf(".")));
-                label.setIcon(resizeIcon(FileSystemView.getFileSystemView().getSystemIcon(file), 48, 48));
+                if(!shortcutIcons.containsKey(file)){
+                    shortcutIcons.put(file, resizeIcon(FileSystemView.getFileSystemView().getSystemIcon(file), 48, 48));
+                }
+                label.setIcon(shortcutIcons.get(file));
                 label.setForeground(textColor);
                 label.setBackground(null);
                 label.setBorder(null);
@@ -196,12 +199,25 @@ public class VNLibrary {
                 if(isSelected){
                     label.setBackground(selectColor);
                     label.setBorder(BorderFactory.createEmptyBorder(0,15,0,0));
-                    try{
-                        fx = AudioSystem.getAudioInputStream(VNLibrary.class.getResource("Assets/pull.wav"));
-                        clip = AudioSystem.getClip();
-                        clip.open(fx);
-                        clip.start();
-                    } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e) { System.out.println("Error: Sound effect broken"); }
+                    
+                    new Thread(() -> {
+                        try{
+                            if(clip != null && clip.isRunning()){
+                                clip.stop();
+                                //clip.close();
+                            }
+                            if(clip != null){
+                                clip.setFramePosition(0);
+                                clip.start();
+                            }
+                            else{
+                                fx = AudioSystem.getAudioInputStream(VNLibrary.class.getResource("Assets/pull.wav"));
+                                clip = AudioSystem.getClip();
+                                clip.open(fx);
+                                clip.start();
+                            }
+                        } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e) { System.out.println("Error: Sound effect broken"); }
+                    }).start();
                 } else {
                     label.setBackground(null);
                     label.setBorder(null);
@@ -210,12 +226,12 @@ public class VNLibrary {
             return label;
         }
         public Icon resizeIcon(Icon icon, int width, int height){
-            buffered = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
-            buffImg = buffered.createGraphics();
+            BufferedImage buffered = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D buffImg = buffered.createGraphics();
             icon.paintIcon(null, buffImg, 0, 0);
             buffImg.dispose();
 
-            scaled = buffered.getScaledInstance(width, height, Image.SCALE_DEFAULT);
+            Image scaled = buffered.getScaledInstance(width, height, Image.SCALE_DEFAULT);
             return new ImageIcon(scaled);
         }
     }
